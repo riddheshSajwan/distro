@@ -1,0 +1,40 @@
+import type { MouseEventHandler, ReactNode } from 'react'
+import { Link } from 'react-router'
+import { cn } from '../lib/cn'
+
+type Tone = 'accent' | 'muted'
+
+const tones: Record<Tone, string> = {
+  accent: 'text-accent hover:underline',
+  muted: 'text-text-muted hover:text-text',
+}
+
+type TextLinkProps = {
+  children: ReactNode
+  tone?: Tone
+  className?: string
+  // Renders a router link when `to` is set, otherwise a button that looks like a link.
+  to?: string
+  onClick?: MouseEventHandler<HTMLElement>
+}
+
+export function TextLink({ children, tone = 'accent', className, to, onClick }: TextLinkProps) {
+  const classes = cn(
+    'cursor-pointer rounded-base text-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
+    tones[tone],
+    className,
+  )
+
+  if (to) {
+    return (
+      <Link to={to} onClick={onClick} className={classes}>
+        {children}
+      </Link>
+    )
+  }
+  return (
+    <button type="button" onClick={onClick} className={classes}>
+      {children}
+    </button>
+  )
+}

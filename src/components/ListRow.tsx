@@ -46,6 +46,20 @@ export function ListRow({ title, description, meta, trailing, href, onClick }: L
   return <div className={classes}>{content}</div>
 }
 
+// Placeholder row with the same shape as a ListRow, shown while a list loads.
+export function ListRowSkeleton() {
+  return (
+    <div className="flex w-full items-start gap-2 px-2 py-2" aria-hidden="true">
+      <div className="flex flex-1 flex-col gap-1">
+        <div className="h-2 w-2/3 animate-pulse rounded-base bg-surface" />
+        <div className="h-2 w-1/2 animate-pulse rounded-base bg-surface" />
+        <div className="h-2 w-1/3 animate-pulse rounded-base bg-surface" />
+      </div>
+      <div className="h-3 w-6 shrink-0 animate-pulse rounded-base bg-surface" />
+    </div>
+  )
+}
+
 export function List({ children }: { children: ReactNode }) {
   return (
     <div className="divide-y divide-border overflow-hidden rounded-base border border-border bg-background">

@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint && node scripts/check-tokens.mjs",
     "preview": "vite preview",
-    "test:rls": "node --env-file=.env.local scripts/rls-test.mjs"
+    "test:rls": "node --env-file=.env.local scripts/rls-test.mjs",
+    "gen:types": "supabase gen types typescript --linked > src/lib/database.types.ts"
   },
   "dependencies": {
     "@fontsource/inter": "^5.3.0",
@@ -16,6 +17,7 @@
     "@tailwindcss/vite": "^4.3.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-router": "^8.5.1",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {

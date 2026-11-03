@@ -174,10 +174,19 @@ Log exactly these seven events and no others.
 - Textarea (with character counter)
 - Toggle
 - Card
-- List and ListRow
+- List, ListRow and ListRowSkeleton (loading placeholder)
 - StatusBadge: queued `text-muted`, ready `accent`, failed `danger`, posted `success`
-- EmptyState
+- EmptyState (also used for load errors, with a Retry action)
 - PageContainer
 - Field (the shared label and error layout)
+- TextLink (router link, or a button that looks like a link; `accent` or `muted`)
+- AppHeader (the shared header)
 
-`src/Showcase.tsx` is the design system check page. `App` renders it until the router exists.
+`src/Showcase.tsx` is the design system check page, served at `/design` in local dev only.
+
+## Code layout
+- `src/screens/` holds one file per screen. `src/auth/` holds the session provider and `RequireAuth`, which guards every route except `/login`.
+- Routes: `/login` and `/` (Requests). The Brief and Voice routes are added in their own prompts.
+- `src/lib/supabase.ts` is the only Supabase client. `src/lib/database.types.ts` is generated: run `npm run gen:types` after every migration.
+- `npm run test:rls` runs the manual RLS check against the linked project.
+- `vercel.json` rewrites every path to `index.html`, so the app works as a single page app.
