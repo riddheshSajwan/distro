@@ -4,6 +4,8 @@
 - We build **one prompt at a time**. Do only what the current prompt asks. Never jump ahead to migrations, edge functions or screens that haven't been requested.
 - When a message says "do not build", reply in prose only and write no code.
 - When a new instruction conflicts with this file, flag the conflict before building.
+- All work happens on `develop`. Never commit to `main`; the user merges `develop` into `main` through a PR.
+- Commit only when asked. No Claude co-author or "Generated with" lines in commits or PRs.
 
 ## Product
 distro takes a LinkedIn topic that a B2B marketer has already picked. It returns a one-page brief of sourced facts and a first draft in their page's voice. The marketer edits the draft, gets it approved and posts it themselves.
