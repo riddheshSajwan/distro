@@ -18,7 +18,7 @@ export function Login() {
   const [sentTo, setSentTo] = useState<string>()
 
   if (session === undefined) return null
-  // TODO(Voice screen): first login (no pages row) goes to /voice instead. RequireAuth will handle it.
+  // RequireAuth sends a user without a pages row (first login) on to /voice.
   if (session) return <Navigate to="/" replace />
 
   async function handleSubmit(event: FormEvent) {

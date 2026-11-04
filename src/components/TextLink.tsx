@@ -13,12 +13,14 @@ type TextLinkProps = {
   children: ReactNode
   tone?: Tone
   className?: string
-  // Renders a router link when `to` is set, otherwise a button that looks like a link.
+  // Renders a router link when `to` is set, an external link that opens in a new tab
+  // when `href` is set, otherwise a button that looks like a link.
   to?: string
+  href?: string
   onClick?: MouseEventHandler<HTMLElement>
 }
 
-export function TextLink({ children, tone = 'accent', className, to, onClick }: TextLinkProps) {
+export function TextLink({ children, tone = 'accent', className, to, href, onClick }: TextLinkProps) {
   const classes = cn(
     'cursor-pointer rounded-base text-body focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
     tones[tone],
@@ -30,6 +32,13 @@ export function TextLink({ children, tone = 'accent', className, to, onClick }: 
       <Link to={to} onClick={onClick} className={classes}>
         {children}
       </Link>
+    )
+  }
+  if (href) {
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer" onClick={onClick} className={classes}>
+        {children}
+      </a>
     )
   }
   return (
