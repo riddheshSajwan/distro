@@ -14,8 +14,7 @@ export function AppHeader() {
           distro
         </Link>
         <nav className="flex items-center gap-3">
-          {/* TODO(Voice screen): point this at /voice once the screen exists. */}
-          <TextLink tone="muted" to="/voice" onClick={(e) => e.preventDefault()}>
+          <TextLink tone="muted" to="/voice">
             Voice
           </TextLink>
           <TextLink tone="muted" onClick={() => supabase.auth.signOut()}>

@@ -186,7 +186,8 @@ Log exactly these seven events and no others.
 
 ## Code layout
 - `src/screens/` holds one file per screen. `src/auth/` holds the session provider and `RequireAuth`, which guards every route except `/login`.
-- Routes: `/login` and `/` (Requests). The Brief and Voice routes are added in their own prompts.
+- Routes: `/login`, `/` (Requests), `/requests/:id` (Brief) and `/voice`.
+- `src/lib/events.ts` is the only place the browser logs events. `src/lib/pipeline.ts` holds the browser's calls into the edge functions (`startBrief`, `retryBrief`, `retryDraft`).
 - `src/lib/supabase.ts` is the only Supabase client. `src/lib/database.types.ts` is generated: run `npm run gen:types` after every migration.
 - `npm run test:rls` runs the manual RLS check against the linked project.
 - `vercel.json` rewrites every path to `index.html`, so the app works as a single page app.
