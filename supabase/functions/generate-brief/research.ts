@@ -1,6 +1,6 @@
 import Anthropic from 'npm:@anthropic-ai/sdk@1.4.0'
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0'
-import { BRIEF_PROMPT_VERSION, MODEL } from '../_shared/config.ts'
+import { MODEL } from '../_shared/config.ts'
 import type { Candidate } from '../_shared/sourceCheck.ts'
 import { writeAudit } from '../_shared/supabase.ts'
 
@@ -64,11 +64,13 @@ type ResearchInput = {
   requestId: string
   topic: string
   angle: string | null
+  // requests.prompt_version for this request: "brief_v1+draft_v1", or "brief_v1" with the draft off.
+  promptVersion: string
 }
 
 // Haiku with web search. Returns the model's candidates in its order. Every call to
 // Claude writes one api_audit_log row; a failed call throws after its row is written.
-export async function research({ admin, userId, requestId, topic, angle }: ResearchInput): Promise<Candidate[]> {
+export async function research({ admin, userId, requestId, topic, angle, promptVersion }: ResearchInput): Promise<Candidate[]> {
   const client = new Anthropic({ apiKey: Deno.env.get('ANTHROPIC_API_KEY'), timeout: 110_000, maxRetries: 1 })
   const today = new Date().toISOString().slice(0, 10)
   const messages: Anthropic.MessageParam[] = [
@@ -94,7 +96,7 @@ export async function research({ admin, userId, requestId, topic, angle }: Resea
         request_id: requestId,
         function_name: 'generate-brief',
         model: MODEL,
-        prompt_version: BRIEF_PROMPT_VERSION,
+        prompt_version: promptVersion,
         input_tokens: null,
         output_tokens: null,
         web_searches: null,
@@ -115,7 +117,7 @@ export async function research({ admin, userId, requestId, topic, angle }: Resea
       request_id: requestId,
       function_name: 'generate-brief',
       model: MODEL,
-      prompt_version: BRIEF_PROMPT_VERSION,
+      prompt_version: promptVersion,
       input_tokens: response.usage.input_tokens,
       output_tokens: response.usage.output_tokens,
       web_searches: response.usage.server_tool_use?.web_search_requests ?? 0,
