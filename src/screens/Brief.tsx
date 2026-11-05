@@ -13,13 +13,15 @@ import { Toggle } from '../components/Toggle'
 import type { Tables } from '../lib/database.types'
 import { logEvent } from '../lib/events'
 import { formatDate, formatDay } from '../lib/format'
-import { retryBrief, retryDraft } from '../lib/pipeline'
+import { markTimedOut, retryBrief, retryDraft } from '../lib/pipeline'
 import { supabase } from '../lib/supabase'
 
 const POLL_MS = 3000
 const AUTOSAVE_MS = 1000
 const COPIED_MS = 2000
 const MAX_FACTS = 6
+// After this long in queued, ask the server to mark the request failed. The server re-checks the time.
+const RUN_TIMEOUT_MS = 5 * 60 * 1000
 
 type Request = Tables<'requests'>
 type Fact = Pick<Tables<'facts'>, 'id' | 'fact_text' | 'source_url' | 'source_title' | 'published_on' | 'used'>
@@ -87,6 +89,7 @@ export function Brief() {
   const status = request?.status
   const polling = !!request && (request.status === 'queued' || draftPending(request))
   const hasFacts = state.kind === 'loaded' && state.facts.length > 0
+  const runStartedAt = request?.run_started_at
 
   useEffect(() => {
     if (!polling) return
@@ -95,6 +98,9 @@ export function Brief() {
 
     const tick = async () => {
       try {
+        if (status === 'queued' && runStartedAt && Date.now() - Date.parse(runStartedAt) >= RUN_TIMEOUT_MS) {
+          await markTimedOut(id)
+        }
         const next = await fetchRequest(id)
         if (next && !cancelled) {
           const facts = next.status !== status || !hasFacts ? await fetchFacts(id) : undefined
@@ -115,7 +121,7 @@ export function Brief() {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [polling, status, hasFacts, id])
+  }, [polling, status, hasFacts, runStartedAt, id])
 
   // Re-read the row after a retry so the screen (and polling) follows the new status.
   const refresh = useCallback(async () => {
@@ -224,10 +230,16 @@ function BriefHeader({ request }: { request: Request }) {
 
 function FailedBrief({ request, onRetried }: { request: Request; onRetried: () => Promise<void> }) {
   const [busy, setBusy] = useState(false)
+  const [retryError, setRetryError] = useState<string>()
 
   async function handleRetry() {
     setBusy(true)
-    await retryBrief(request.id)
+    setRetryError(undefined)
+    try {
+      await retryBrief(request.id)
+    } catch {
+      setRetryError('distro could not start again. Check your connection and try again.')
+    }
     await onRetried()
     setBusy(false)
   }
@@ -240,6 +252,7 @@ function FailedBrief({ request, onRetried }: { request: Request; onRetried: () =
           Try again
         </Button>
       </div>
+      {retryError && <p className="text-small text-danger">{retryError}</p>}
     </Card>
   )
 }
