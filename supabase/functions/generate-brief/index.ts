@@ -5,12 +5,14 @@
 // background: research with Haiku + web search, the source check, then saves the
 // facts and marks the request ready (or failed when no fact passes).
 //
-// Part A of Prompt 5 ignores include_draft; Part B adds the draft before ready.
+// With include_draft on, it hands the request to generate-draft on the server, which
+// writes the draft and then marks the request ready.
 
 import type { SupabaseClient } from 'npm:@supabase/supabase-js@2.118.0'
-import { BRIEF_PROMPT_VERSION, NO_FACTS_MESSAGE, RESEARCH_ERROR_MESSAGE } from '../_shared/config.ts'
+import { DRAFT_FAILED_MESSAGE, NO_FACTS_MESSAGE, RESEARCH_ERROR_MESSAGE, requestPromptVersion } from '../_shared/config.ts'
 import { json, preflight, readRequestId } from '../_shared/http.ts'
 import { checkSource } from '../_shared/sourceCheck.ts'
+import { markReady } from '../_shared/requests.ts'
 import { adminClient, getUser, logEvent } from '../_shared/supabase.ts'
 import { research } from './research.ts'
 
@@ -24,6 +26,7 @@ type RequestRow = {
   user_id: string
   topic: string
   angle: string | null
+  include_draft: boolean
   status: string
   run_started_at: string
 }
@@ -42,7 +45,7 @@ Deno.serve(async (req) => {
 
   const { data: found, error } = await admin
     .from('requests')
-    .select('id, user_id, topic, angle, status, run_started_at')
+    .select('id, user_id, topic, angle, include_draft, status, run_started_at')
     .eq('id', requestId)
     .eq('user_id', user.id)
     .maybeSingle()
@@ -59,7 +62,7 @@ Deno.serve(async (req) => {
       .update({ status: 'queued', run_started_at: new Date().toISOString(), error_message: null, ready_at: null })
       .eq('id', request.id)
       .eq('status', 'failed')
-      .select('id, user_id, topic, angle, status, run_started_at')
+      .select('id, user_id, topic, angle, include_draft, status, run_started_at')
       .maybeSingle()
     if (resetError) return json({ error: 'Could not restart the request' }, 500)
     if (!reset) return json({ error: 'Request is no longer failed' }, 409)
@@ -98,6 +101,7 @@ async function runBrief(admin: SupabaseClient, request: RequestRow) {
       requestId: request.id,
       topic: request.topic,
       angle: request.angle,
+      promptVersion: requestPromptVersion(request.include_draft),
     })
 
     const checks = await Promise.all(candidates.map((c) => checkSource(c)))
@@ -137,29 +141,22 @@ async function runBrief(admin: SupabaseClient, request: RequestRow) {
       return
     }
 
-    // Ready only from queued, and only for this run.
-    const readyAt = new Date()
-    const { data: ready, error } = await admin
-      .from('requests')
-      .update({ status: 'ready', ready_at: readyAt.toISOString(), prompt_version: BRIEF_PROMPT_VERSION })
-      .eq('id', request.id)
-      .eq('status', 'queued')
-      .eq('run_started_at', runToken)
-      .select('id')
-      .maybeSingle()
-    if (error) throw new Error(`Request not marked ready: ${error.message}`)
-
-    if (!ready) {
-      // Timed out or restarted while the facts were being saved: take this run's facts back out.
-      if (savedIds.length) await admin.from('facts').delete().in('id', savedIds)
-      return
+    if (request.include_draft) {
+      // generate-draft writes the draft and marks the request ready. If it can't even be
+      // started, the draft counts as attempted and failed, and the facts are ready.
+      if (await startDraft(request, runToken)) return
+      await admin
+        .from('requests')
+        .update({ error_message: DRAFT_FAILED_MESSAGE })
+        .eq('id', request.id)
+        .eq('status', 'queued')
+        .eq('run_started_at', runToken)
     }
 
-    await logEvent(admin, request.user_id, 'brief_ready', {
-      request_id: request.id,
-      verified_count: verifiedCount,
-      seconds_to_ready: Math.round((readyAt.getTime() - new Date(runToken).getTime()) / 1000),
-    })
+    if (!(await markReady(admin, request, runToken))) {
+      // Timed out or restarted while the facts were being saved: take this run's facts back out.
+      if (savedIds.length) await admin.from('facts').delete().in('id', savedIds)
+    }
   } catch (error) {
     console.error(`generate-brief ${request.id} failed:`, error instanceof Error ? error.message : error)
     await failRun(admin, request, runToken, RESEARCH_ERROR_MESSAGE)
@@ -169,11 +166,31 @@ async function runBrief(admin: SupabaseClient, request: RequestRow) {
 async function failRun(admin: SupabaseClient, request: RequestRow, runToken: string, message: string) {
   const { data } = await admin
     .from('requests')
-    .update({ status: 'failed', error_message: message, prompt_version: BRIEF_PROMPT_VERSION })
+    .update({ status: 'failed', error_message: message, prompt_version: requestPromptVersion(request.include_draft) })
     .eq('id', request.id)
     .eq('status', 'queued')
     .eq('run_started_at', runToken)
     .select('id')
     .maybeSingle()
   if (data) await logEvent(admin, request.user_id, 'brief_failed', { request_id: request.id, error_message: message })
+}
+
+// Calls generate-draft on the server with the service key, for this run only.
+async function startDraft(request: RequestRow, runToken: string): Promise<boolean> {
+  try {
+    const response = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-draft`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ request_id: request.id, run_started_at: runToken }),
+      signal: AbortSignal.timeout(15_000),
+    })
+    if (response.ok) return true
+    console.error(`generate-draft not started for ${request.id}: HTTP ${response.status} ${await response.text()}`)
+  } catch (error) {
+    console.error(`generate-draft not started for ${request.id}:`, error instanceof Error ? error.message : error)
+  }
+  return false
 }

@@ -13,7 +13,7 @@ import { Toggle } from '../components/Toggle'
 import type { Tables } from '../lib/database.types'
 import { logEvent } from '../lib/events'
 import { formatDate, formatDay } from '../lib/format'
-import { markTimedOut, retryBrief, retryDraft } from '../lib/pipeline'
+import { markDraftTimedOut, markTimedOut, retryBrief, retryDraft } from '../lib/pipeline'
 import { supabase } from '../lib/supabase'
 
 const POLL_MS = 3000
@@ -98,9 +98,9 @@ export function Brief() {
 
     const tick = async () => {
       try {
-        if (status === 'queued' && runStartedAt && Date.now() - Date.parse(runStartedAt) >= RUN_TIMEOUT_MS) {
-          await markTimedOut(id)
-        }
+        const timedOut = !!runStartedAt && Date.now() - Date.parse(runStartedAt) >= RUN_TIMEOUT_MS
+        if (timedOut && status === 'queued') await markTimedOut(id)
+        else if (timedOut && status === 'ready') await markDraftTimedOut(id)
         const next = await fetchRequest(id)
         if (next && !cancelled) {
           const facts = next.status !== status || !hasFacts ? await fetchFacts(id) : undefined
@@ -328,10 +328,16 @@ function FactItem({ requestId, fact, onChange }: { requestId: string; fact: Fact
 
 function DraftSection({ request, onRetried }: { request: Request; onRetried: () => Promise<void> }) {
   const [busy, setBusy] = useState(false)
+  const [retryError, setRetryError] = useState<string>()
 
   async function handleRetry() {
     setBusy(true)
-    await retryDraft(request.id)
+    setRetryError(undefined)
+    try {
+      await retryDraft(request.id)
+    } catch {
+      setRetryError('distro could not start the draft again. Check your connection and try again.')
+    }
     await onRetried()
     setBusy(false)
   }
@@ -349,6 +355,7 @@ function DraftSection({ request, onRetried }: { request: Request; onRetried: () 
             Write draft again
           </Button>
         </div>
+        {retryError && <p className="text-small text-danger">{retryError}</p>}
       </Card>
     )
   } else {

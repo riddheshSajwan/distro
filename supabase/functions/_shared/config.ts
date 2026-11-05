@@ -17,3 +17,4 @@ export const RUN_TIMEOUT_MS = 5 * 60 * 1000
 export const TIMEOUT_MESSAGE = 'This took too long. Try again.'
 export const NO_FACTS_MESSAGE = 'No facts could be checked against their sources. Try a different angle.'
 export const RESEARCH_ERROR_MESSAGE = 'distro could not research this topic. Try again.'
+export const DRAFT_FAILED_MESSAGE = 'The draft could not be written.'
